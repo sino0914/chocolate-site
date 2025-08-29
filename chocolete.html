@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>3D 巧克力</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #2e2a27; }
+    #message {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #fff;
+      font-size: 2em;
+      background: rgba(0,0,0,0.7);
+      padding: 20px 40px;
+      border-radius: 15px;
+      display: none;
+    }
+	
+	#message {
+	  display: none;
+	  opacity: 0;
+	  transition: opacity 0.5s ease;
+	}
+	#message.show {
+	  display: block;
+	  opacity: 1;
+	}
+  </style>
+</head>
+<body>
+  <div id="message">💕 情人節快樂 💕</div>
+  <div>
+	<div id="messageIcon" style="
+      position: absolute;
+      bottom: 35px;
+	  right: 60px;
+	  font-size: 6.5em;
+	  cursor: pointer;
+	  user-select: none;
+	">💌</div>
+	<div id="toggleRotate" style="
+	  position: absolute;
+	  bottom: 50px;
+	  left: 60px;
+	  font-size: 5em;
+	  cursor: pointer;
+	  user-select: none;
+	">
+	  ⏸️
+	</div>
+	<div id="toggleFun" style="
+	  position: absolute;
+	  bottom: 50px;
+	  left: 220px;
+	  font-size: 5em;
+	  cursor: pointer;
+	  user-select: none;
+	">
+	  ⏺️
+	</div>
+  </div>
+  <!-- ⚡ 使用舊版 three.js r124，保證 OrbitControls 掛在全域 -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.124.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.124.0/examples/js/controls/OrbitControls.js"></script>
+
+
+<script>
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
+
+  // 燈光
+  scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+  const pointLight = new THREE.PointLight(0xffffff, 1);
+  pointLight.position.set(5, 5, 5);
+  scene.add(pointLight);
+  const pointLight2 = new THREE.PointLight(0xffffff, 1);
+  pointLight2.position.set(-5, -5, -5);
+  scene.add(pointLight2);
+
+  camera.position.z = 8;
+
+  // OrbitControls
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+
+  // ===============================
+  // 建立梯形巧克力格子
+  // ===============================
+  const chocolateGroup = new THREE.Group();
+
+  const rows = 3;   // 排數
+  const cols = 5;   // 行數
+  const width = 0.8;   // 底部寬
+  const height = 0.4;  // 厚度
+  const depth = 0.8;   // 底部深
+  const topScale = 0.7; // 上表面縮小比例 (越小越斜)
+
+  const material = new THREE.MeshStandardMaterial({
+    color: 0x4b2e2e,
+    roughness: 0.6,
+    metalness: 0.2
+  });
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      // 基本方形
+      const shape = new THREE.Shape();
+      shape.moveTo(-width/2, -depth/2);
+      shape.lineTo(width/2, -depth/2);
+      shape.lineTo(width/2, depth/2);
+      shape.lineTo(-width/2, depth/2);
+      shape.lineTo(-width/2, -depth/2);
+
+      // 拉伸 (帶斜邊 = 上小下大)
+      const extrudeSettings = {
+        steps: 1,
+        depth: height,
+        bevelEnabled: true,
+        bevelThickness: 0.1,
+        bevelSize: (1 - topScale) * (width/2),
+        bevelSegments: 1
+      };
+
+      const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+      const piece = new THREE.Mesh(geometry, material);
+
+      // 定位每塊巧克力
+      piece.position.x = c * (width + 0.15);
+      piece.position.y = r * (depth + 0.15);
+      piece.position.z = -height/2;
+
+      chocolateGroup.add(piece);
+    }
+  }
+  
+  // 讓整塊巧克力對齊中心 (方便 pivot 旋轉)
+  chocolateGroup.position.x = -(cols-1) * (width+0.15) / 2;
+  chocolateGroup.position.y = -(rows-1) * (depth+0.15) / 2;
+
+  // ===============================
+  // 建立 Pivot，控制旋轉中心
+  // ===============================
+  const pivot = new THREE.Group();
+  scene.add(pivot);
+  pivot.add(chocolateGroup);
+
+  // 你可以調整 chocolateGroup 的偏移，改變旋轉中心
+  // 例如：chocolateGroup.position.set(-2,0,0);
+  
+  //讓巧克力傾斜
+  pivot.rotation.z = 0.4;
+  
+  // ===============================
+  // 音檔播放邏輯
+  // ===============================
+  const audioFiles = [
+  "a001.mp3","a002.mp3","a003.mp3","a004.mp3","a005.mp3",
+  "a006.mp3","a007.mp3","a008.mp3","a009.mp3","a010.mp3",
+  "a011.mp3","a012.mp3","a013.mp3","a014.mp3","a015.mp3",
+  "a016.mp3","a017.mp3","a018.mp3","a019.mp3","a020.mp3",
+  "a021.mp3","a022.mp3","a023.mp3","a024.mp3","a025.mp3",
+  "a026.mp3","a027.mp3","a028.mp3","a029.mp3","a030.mp3",
+  "a031.mp3","a032.mp3","a033.mp3","a034.mp3","a035.mp3",
+  "a036.mp3","a037.mp3","a038.mp3","a039.mp3","a040.mp3",
+  "a041.mp3","a042.mp3","a043.mp3","a044.mp3","a045.mp3",
+  "a046.mp3","a047.mp3","a048.mp3","a049.mp3","a050.mp3",
+  "a051.mp3","a052.mp3","a053.mp3","a054.mp3","a055.mp3",
+  "a056.mp3","a057.mp3","a058.mp3","a059.mp3","a060.mp3",
+  "a061.mp3","a062.mp3","a063.mp3","a064.mp3","a065.mp3",
+  "a066.mp3","a067.mp3","a068.mp3","a069.mp3","a070.mp3",
+  "a071.mp3","a072.mp3","a073.mp3","a074.mp3","a075.mp3",
+  "a076.mp3","a077.mp3","a078.mp3","a079.mp3","a080.mp3",
+  "a081.mp3","a082.mp3","a083.mp3","a084.mp3","a085.mp3",
+  "a086.mp3","a087.mp3","a088.mp3","a089.mp3","a090.mp3",
+  "a091.mp3","a092.mp3","a093.mp3","a094.mp3","a095.mp3",
+  "a096.mp3","a097.mp3","a098.mp3","a099.mp3","a100.mp3",
+  "a101.mp3","a102.mp3","a103.mp3","a104.mp3","a105.mp3",
+  "a106.mp3","a107.mp3","a108.mp3","a109.mp3","a110.mp3",
+  "a111.mp3","a112.mp3","a113.mp3","a114.mp3","a115.mp3",
+  "a116.mp3","a117.mp3","a118.mp3","a119.mp3","a120.mp3",
+  "a121.mp3","a122.mp3","a123.mp3","a124.mp3","a125.mp3",
+  "a126.mp3","a127.mp3","a128.mp3","a129.mp3","a130.mp3",
+  "a131.mp3","a132.mp3","a133.mp3","a134.mp3","a135.mp3",
+  "a136.mp3","a137.mp3","a138.mp3","a139.mp3","a140.mp3",
+  "a141.mp3","a142.mp3","a143.mp3","a144.mp3","a145.mp3",
+  "a146.mp3","a147.mp3","a148.mp3","a149.mp3","a150.mp3",
+  "a151.mp3","a152.mp3","a153.mp3","a154.mp3","a155.mp3",
+  "a156.mp3","a157.mp3","a158.mp3","a159.mp3","a160.mp3",
+  "a161.mp3","a162.mp3","a163.mp3","a164.mp3"
+];
+
+  let currentAudioIndex = 0;
+  const audioPlayers = audioFiles.map(src => {
+  const audio = new Audio(src);
+  audio.preload = "auto"; // 提示瀏覽器預先下載
+  return audio;
+});
+
+  function playNextAudio() {
+  audioPlayers[currentAudioIndex].currentTime = 0; // 從頭播放
+  audioPlayers[currentAudioIndex].play();
+    currentAudioIndex = (currentAudioIndex + 1) % audioFiles.length; // 播到最後回 0
+  }
+  // ===============================
+  // 點擊事件 → 播放音檔 + 彈跳效果
+  // ===============================
+  function handleChocolateTap(event) {
+  
+  const raycaster = new THREE.Raycaster();
+  const mouse = new THREE.Vector2();
+  
+  // 兼容 touch 事件取座標
+  let clientX, clientY;
+  if (event.touches && event.touches.length > 0) {
+    clientX = event.touches[0].clientX;
+    clientY = event.touches[0].clientY;
+  } else {
+    clientX = event.clientX;
+    clientY = event.clientY;
+  }
+
+  mouse.x = (clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+
+  const intersects = raycaster.intersectObjects(chocolateGroup.children);
+  if (intersects.length > 0) {
+    const piece = intersects[0].object;
+
+    // 播放下一個音檔
+    playNextAudio();
+
+    // 縮放彈跳效果
+    let scale = 1;
+    let direction = -1;
+    function bounce() {
+      scale += direction * 0.05;
+      piece.scale.set(scale, scale, scale);
+
+      if (scale <= 0.8) direction = 1;
+      if (scale >= 1) {
+        piece.scale.set(1, 1, 1);
+        return;
+      }
+      requestAnimationFrame(bounce);
+    }
+    bounce();
+  }
+}
+  // 電腦用
+window.addEventListener("click", handleChocolateTap);
+// 手機用
+window.addEventListener("touchstart", handleChocolateTap);
+  
+  let isRotating = true; // 預設旋轉中
+  const toggleBtn = document.getElementById("toggleRotate");
+
+  toggleBtn.addEventListener("click", () => {
+    isRotating = !isRotating; // 切換狀態
+    toggleBtn.innerText = isRotating ? "⏸️" : "▶️";
+  });
+
+
+  const toggleFun = document.getElementById("toggleFun");
+
+  toggleFun.addEventListener("click", () => {
+  const tempIndex = currentAudioIndex - 1;
+  if(tempIndex < 0)tempIndex = audioFiles.length - 1;
+  audioPlayers[tempIndex].currentTime = 0; // 從頭播放
+  audioPlayers[tempIndex].play();
+  });
+
+  // ===============================
+  // 動畫
+  // ===============================
+  function animate() {
+    requestAnimationFrame(animate);
+	
+    if (isRotating) {
+      pivot.rotation.y += 0.005;
+    }
+    controls.update();
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  // 窗口縮放
+  window.addEventListener("resize", () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+  
+  const icon = document.getElementById("messageIcon");
+  const msg = document.getElementById("message");
+
+  icon.addEventListener("click", () => {
+    msg.classList.toggle("show");
+  });
+</script>
+
+</body>
+</html>
