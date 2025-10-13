@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hi,寶玉</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .controls {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 12px 30px;
+            font-size: 16px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 5px;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #5568d3;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+			display:none;
+        }
+
+        .info {
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 18px;
+            color: #333;
+        }
+
+        #puzzle-container {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 2px;
+            background: #333;
+            padding: 2px;
+            border-radius: 8px;
+            max-width: 700px;
+            margin: 0 auto;
+            width: fit-content;
+            transition: gap 0.3s, padding 0.3s, background 0.3s;
+        }
+
+        #puzzle-container.completed {
+            gap: 0;
+            padding: 0;
+            background: transparent;
+        }
+
+        .puzzle-piece {
+            width: 60px;
+            height: 90px;
+            background-size: 700% 700%;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.1s, border 0.3s;
+            border: 1px solid #666;
+            background-repeat: no-repeat;
+        }
+
+        .puzzle-piece.completed {
+            border: none;
+            cursor: default;
+        }
+
+        .puzzle-piece:hover:not(.completed) {
+            transform: scale(1.05);
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            z-index: 10;
+        }
+
+        .puzzle-piece.selected {
+            border: 3px solid #ffd700;
+            transform: scale(1.1);
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
+        }
+
+        .success-message {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 50px rgba(0,0,0,0.5);
+            text-align: center;
+            display: none;
+            z-index: 1000;
+        }
+
+        .success-message.show {
+            display: block;
+            animation: popIn 0.5s ease-out;
+        }
+
+        @keyframes popIn {
+            0% {
+                transform: translate(-50%, -50%) scale(0.5);
+                opacity: 0;
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 1;
+            }
+        }
+
+        .success-message h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 32px;
+        }
+
+        .success-message p {
+            color: #666;
+            font-size: 18px;
+            margin-bottom: 20px;
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            z-index: 999;
+        }
+
+        .overlay.show {
+            display: block;
+        }
+
+        @media (max-width: 768px) {
+            #puzzle-container {
+                max-width: 90vw;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Hi,寶玉</h1>
+
+        <div class="controls">
+            <button id="shuffle-btn" disabled>再玩一次</button>
+            <button id="download-btn" disabled>下載圖片</button>
+            <button id="solve-btn" style="display:none;">顯示原圖</button>
+        </div>
+
+        <div class="info">
+            <span>移動次數: <strong id="moves">0</strong></span> |
+            <span>時間: <strong id="timer">0</strong> 秒</span>
+        </div>
+
+        <div id="puzzle-container"></div>
+    </div>
+
+    <div class="overlay" id="overlay"></div>
+    <div class="success-message" id="success-message">
+        <h2>恭喜完成！</h2>
+        <p>移動次數: <strong id="final-moves">0</strong></p>
+        <p>完成時間: <strong id="final-time">0</strong> 秒</p>
+        <button id="close-message">關閉</button>
+    </div>
+
+    <script>
+        const GRID_SIZE = 7;
+        const TOTAL_PIECES = GRID_SIZE * GRID_SIZE;
+        const IMAGE_PATH = 'image.png';
+
+        let pieces = [];
+        let selectedPiece = null;
+        let moves = 0;
+        let timer = 0;
+        let timerInterval = null;
+        let isGameStarted = false;
+
+        const puzzleContainer = document.getElementById('puzzle-container');
+        const movesDisplay = document.getElementById('moves');
+        const timerDisplay = document.getElementById('timer');
+        const shuffleBtn = document.getElementById('shuffle-btn');
+        const downloadBtn = document.getElementById('download-btn');
+        const solveBtn = document.getElementById('solve-btn');
+        const successMessage = document.getElementById('success-message');
+        const overlay = document.getElementById('overlay');
+        const closeMessageBtn = document.getElementById('close-message');
+
+        // 初始化拼圖
+        function initPuzzle() {
+            puzzleContainer.innerHTML = '';
+            pieces = [];
+
+            for (let i = 0; i < TOTAL_PIECES; i++) {
+                const piece = document.createElement('div');
+                piece.className = 'puzzle-piece';
+                piece.dataset.currentPos = i;
+                piece.dataset.correctPos = i;
+
+                const row = Math.floor(i / GRID_SIZE);
+                const col = i % GRID_SIZE;
+
+                piece.style.backgroundImage = `url('${IMAGE_PATH}')`;
+                piece.style.backgroundPosition = `${col * (100 / (GRID_SIZE - 1))}% ${row * (100 / (GRID_SIZE - 1))}%`;
+
+                piece.addEventListener('click', () => handlePieceClick(piece));
+
+                puzzleContainer.appendChild(piece);
+                pieces.push(piece);
+            }
+        }
+
+        // 處理拼圖片點擊
+        function handlePieceClick(piece) {
+            if (!isGameStarted) {
+                startGame();
+            }
+
+            if (selectedPiece === null) {
+                selectedPiece = piece;
+                piece.classList.add('selected');
+            } else if (selectedPiece === piece) {
+                piece.classList.remove('selected');
+                selectedPiece = null;
+            } else {
+                swapPieces(selectedPiece, piece);
+                selectedPiece.classList.remove('selected');
+                selectedPiece = null;
+                moves++;
+                movesDisplay.textContent = moves;
+
+                if (checkWin()) {
+                    winGame();
+                }
+            }
+        }
+
+        // 交換兩片拼圖
+        function swapPieces(piece1, piece2) {
+            const tempBgPos = piece1.style.backgroundPosition;
+            piece1.style.backgroundPosition = piece2.style.backgroundPosition;
+            piece2.style.backgroundPosition = tempBgPos;
+
+            const tempCorrectPos = piece1.dataset.correctPos;
+            piece1.dataset.correctPos = piece2.dataset.correctPos;
+            piece2.dataset.correctPos = tempCorrectPos;
+        }
+
+        // 打亂拼圖
+        function shufflePuzzle() {
+            // 移除完成狀態的樣式
+            puzzleContainer.classList.remove('completed');
+            pieces.forEach(piece => {
+                piece.classList.remove('completed');
+            });
+
+            for (let i = 0; i < TOTAL_PIECES * 3; i++) {
+                const idx1 = Math.floor(Math.random() * TOTAL_PIECES);
+                const idx2 = Math.floor(Math.random() * TOTAL_PIECES);
+                swapPieces(pieces[idx1], pieces[idx2]);
+            }
+            resetGame();
+
+            // 禁用「再玩一次」和「下載圖片」按鈕
+            shuffleBtn.disabled = true;
+            downloadBtn.disabled = true;
+        }
+
+        // 檢查是否完成
+        function checkWin() {
+            return pieces.every((piece, index) => {
+                return parseInt(piece.dataset.correctPos) === index;
+            });
+        }
+
+        // 開始計時
+        function startGame() {
+            if (!isGameStarted) {
+                isGameStarted = true;
+                timerInterval = setInterval(() => {
+                    timer++;
+                    timerDisplay.textContent = timer;
+                }, 1000);
+            }
+        }
+
+        // 重置遊戲狀態
+        function resetGame() {
+            moves = 0;
+            timer = 0;
+            isGameStarted = false;
+            movesDisplay.textContent = moves;
+            timerDisplay.textContent = timer;
+            clearInterval(timerInterval);
+            selectedPiece = null;
+        }
+
+        // 遊戲勝利
+        function winGame() {
+            clearInterval(timerInterval);
+
+            // 移除所有拼圖片的框線，組合成完整圖片
+            puzzleContainer.classList.add('completed');
+            pieces.forEach(piece => {
+                piece.classList.add('completed');
+            });
+
+            // 啟用「再玩一次」和「下載圖片」按鈕
+            shuffleBtn.disabled = false;
+            downloadBtn.disabled = false;
+
+            // 延遲顯示成功訊息，讓玩家先看到完整圖片
+            setTimeout(() => {
+                document.getElementById('final-moves').textContent = moves;
+                document.getElementById('final-time').textContent = timer;
+                overlay.classList.add('show');
+                successMessage.classList.add('show');
+            }, 800);
+        }
+
+        // 顯示原圖
+        function showSolution() {
+            initPuzzle();
+            resetGame();
+            shuffleBtn.disabled = true;
+            downloadBtn.disabled = true;
+        }
+
+        // 下載圖片
+        function downloadImage() {
+            const link = document.createElement('a');
+            link.href = IMAGE_PATH;
+            link.download = 'puzzle_completed.png';
+            link.click();
+        }
+
+        // 關閉成功訊息
+        function closeSuccessMessage() {
+            overlay.classList.remove('show');
+            successMessage.classList.remove('show');
+        }
+
+        // 事件監聽器
+        shuffleBtn.addEventListener('click', shufflePuzzle);
+        downloadBtn.addEventListener('click', downloadImage);
+        solveBtn.addEventListener('click', showSolution);
+        closeMessageBtn.addEventListener('click', closeSuccessMessage);
+
+        // 初始化遊戲
+        initPuzzle();
+        shufflePuzzle();
+    </script>
+</body>
+</html>
