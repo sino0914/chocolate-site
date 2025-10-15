@@ -71,7 +71,7 @@
 
         #puzzle-container {
             display: grid;
-            grid-template-columns: repeat(7, 1fr);
+            grid-template-columns: repeat(var(--grid-size, 7), 1fr);
             gap: 2px;
             background: #333;
             padding: 2px;
@@ -89,9 +89,9 @@
         }
 
         .puzzle-piece {
-            width: 60px;
-            height: 90px;
-            background-size: 700% 700%;
+            width: var(--piece-width, 60px);
+            height: var(--piece-height, 90px);
+            background-size: calc(var(--grid-size, 7) * 100%) calc(var(--grid-size, 7) * 100%);
             cursor: pointer;
             transition: transform 0.1s, box-shadow 0.1s, border 0.3s;
             border: 1px solid #666;
@@ -184,6 +184,7 @@
         <h1>Hi,寶玉</h1>
 
         <div class="controls">
+            <button id="start-love-btn">開始戀愛</button>
             <button id="shuffle-btn" disabled>再玩一次</button>
             <button id="download-btn" disabled>下載圖片</button>
             <button id="solve-btn" style="display:none;">顯示原圖</button>
@@ -206,9 +207,16 @@
     </div>
 
     <script>
-        const GRID_SIZE = 7;
-        const TOTAL_PIECES = GRID_SIZE * GRID_SIZE;
-        const IMAGE_PATH = Math.random() < 0.5 ? 'image.png' : 'image2.png';
+        // 照片陣列 - 方便未來新增更多照片
+        const IMAGES = [
+            'image.png',
+            'image2.png'
+            // 在這裡新增更多照片路徑
+        ];
+
+        let GRID_SIZE = 7;
+        let TOTAL_PIECES = GRID_SIZE * GRID_SIZE;
+        let IMAGE_PATH = IMAGES[0];
 
         let pieces = [];
         let selectedPiece = null;
@@ -220,6 +228,7 @@
         const puzzleContainer = document.getElementById('puzzle-container');
         const movesDisplay = document.getElementById('moves');
         const timerDisplay = document.getElementById('timer');
+        const startLoveBtn = document.getElementById('start-love-btn');
         const shuffleBtn = document.getElementById('shuffle-btn');
         const downloadBtn = document.getElementById('download-btn');
         const solveBtn = document.getElementById('solve-btn');
@@ -227,27 +236,112 @@
         const overlay = document.getElementById('overlay');
         const closeMessageBtn = document.getElementById('close-message');
 
+        // localStorage 功能
+        function saveGameState() {
+            const gameState = {
+                gridSize: GRID_SIZE,
+                imagePath: IMAGE_PATH,
+                moves: moves,
+                timer: timer,
+                isGameStarted: isGameStarted,
+                pieces: pieces.map(piece => ({
+                    correctPos: piece.dataset.correctPos,
+                    backgroundPosition: piece.style.backgroundPosition
+                }))
+            };
+            localStorage.setItem('puzzleGameState', JSON.stringify(gameState));
+        }
+
+        function loadGameState() {
+            const savedState = localStorage.getItem('puzzleGameState');
+            if (savedState) {
+                const gameState = JSON.parse(savedState);
+                GRID_SIZE = gameState.gridSize;
+                TOTAL_PIECES = GRID_SIZE * GRID_SIZE;
+                IMAGE_PATH = gameState.imagePath;
+                moves = gameState.moves;
+                timer = gameState.timer;
+                isGameStarted = gameState.isGameStarted;
+
+                movesDisplay.textContent = moves;
+                timerDisplay.textContent = timer;
+
+                return gameState.pieces;
+            }
+            return null;
+        }
+
+        // 開始戀愛 - 隨機選擇照片和拼圖大小
+        function startNewLove() {
+            // 清除舊的遊戲狀態
+            localStorage.removeItem('puzzleGameState');
+
+            // 隨機選擇照片
+            IMAGE_PATH = IMAGES[Math.floor(Math.random() * IMAGES.length)];
+
+            // 隨機選擇拼圖大小 (4x4 ~ 12x12)
+            GRID_SIZE = Math.floor(Math.random() * 9) + 4; // 4 到 12
+            TOTAL_PIECES = GRID_SIZE * GRID_SIZE;
+
+            // 更新 CSS 變數
+            updateGridStyle();
+
+            // 初始化並打亂拼圖
+            initPuzzle();
+            shufflePuzzle();
+        }
+
+        // 更新網格樣式
+        function updateGridStyle() {
+            // 固定拼圖總寬度為 600px，根據 GRID_SIZE 計算每片的寬度
+            const totalWidth = 600;
+            const pieceWidth = Math.floor(totalWidth / GRID_SIZE);
+            const pieceHeight = Math.floor(pieceWidth * 1.5);
+
+            puzzleContainer.style.setProperty('--grid-size', GRID_SIZE);
+            puzzleContainer.style.setProperty('--piece-width', `${pieceWidth}px`);
+            puzzleContainer.style.setProperty('--piece-height', `${pieceHeight}px`);
+
+            // 更新容器最大寬度，確保拼圖大小一致
+            puzzleContainer.style.maxWidth = `${totalWidth + 4}px`; // +4 for padding
+        }
+
         // 初始化拼圖
         function initPuzzle() {
             puzzleContainer.innerHTML = '';
             pieces = [];
 
+            updateGridStyle();
+
+            const savedPieces = loadGameState();
+
             for (let i = 0; i < TOTAL_PIECES; i++) {
                 const piece = document.createElement('div');
                 piece.className = 'puzzle-piece';
                 piece.dataset.currentPos = i;
-                piece.dataset.correctPos = i;
 
                 const row = Math.floor(i / GRID_SIZE);
                 const col = i % GRID_SIZE;
 
                 piece.style.backgroundImage = `url('${IMAGE_PATH}')`;
-                piece.style.backgroundPosition = `${col * (100 / (GRID_SIZE - 1))}% ${row * (100 / (GRID_SIZE - 1))}%`;
+
+                if (savedPieces && savedPieces[i]) {
+                    piece.dataset.correctPos = savedPieces[i].correctPos;
+                    piece.style.backgroundPosition = savedPieces[i].backgroundPosition;
+                } else {
+                    piece.dataset.correctPos = i;
+                    piece.style.backgroundPosition = `${col * (100 / (GRID_SIZE - 1))}% ${row * (100 / (GRID_SIZE - 1))}%`;
+                }
 
                 piece.addEventListener('click', () => handlePieceClick(piece));
 
                 puzzleContainer.appendChild(piece);
                 pieces.push(piece);
+            }
+
+            // 如果載入了已開始的遊戲，重新啟動計時器
+            if (savedPieces && isGameStarted) {
+                startGame();
             }
         }
 
@@ -269,6 +363,9 @@
                 selectedPiece = null;
                 moves++;
                 movesDisplay.textContent = moves;
+
+                // 儲存遊戲狀態
+                saveGameState();
 
                 if (checkWin()) {
                     winGame();
@@ -301,6 +398,9 @@
                 swapPieces(pieces[idx1], pieces[idx2]);
             }
             resetGame();
+
+            // 儲存打亂後的狀態
+            saveGameState();
 
             // 禁用「再玩一次」和「下載圖片」按鈕
             shuffleBtn.disabled = true;
@@ -339,6 +439,9 @@
         // 遊戲勝利
         function winGame() {
             clearInterval(timerInterval);
+
+            // 清除遊戲狀態
+            localStorage.removeItem('puzzleGameState');
 
             // 移除所有拼圖片的框線，組合成完整圖片
             puzzleContainer.classList.add('completed');
@@ -382,14 +485,20 @@
         }
 
         // 事件監聽器
+        startLoveBtn.addEventListener('click', startNewLove);
         shuffleBtn.addEventListener('click', shufflePuzzle);
         downloadBtn.addEventListener('click', downloadImage);
         solveBtn.addEventListener('click', showSolution);
         closeMessageBtn.addEventListener('click', closeSuccessMessage);
 
-        // 初始化遊戲
-        initPuzzle();
-        shufflePuzzle();
+        // 初始化遊戲 - 如果有儲存的遊戲狀態就載入，否則開始新遊戲
+        const hasSavedGame = localStorage.getItem('puzzleGameState');
+        if (hasSavedGame) {
+            initPuzzle();
+        } else {
+            initPuzzle();
+            shufflePuzzle();
+        }
     </script>
 </body>
 </html>
