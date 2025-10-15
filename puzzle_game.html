@@ -208,7 +208,7 @@
     <script>
         const GRID_SIZE = 7;
         const TOTAL_PIECES = GRID_SIZE * GRID_SIZE;
-        const IMAGE_PATH = 'image.png';
+        const IMAGE_PATH = Math.random() < 0.5 ? 'image.png' : 'image2.png';
 
         let pieces = [];
         let selectedPiece = null;
