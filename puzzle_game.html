@@ -177,9 +177,108 @@
                 max-width: 90vw;
             }
         }
+
+        /* 成就系統樣式 */
+        .achievements-panel {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+            max-width: 250px;
+            max-height: 80vh;
+            overflow-y: auto;
+            z-index: 100;
+        }
+
+        .achievements-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .achievement-item {
+            margin-bottom: 15px;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+
+        .achievement-item.unlocked {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .achievement-image {
+            width: 100%;
+            height: 120px;
+            background-size: cover;
+            background-position: center;
+            border-radius: 5px;
+            cursor: pointer;
+            position: relative;
+            transition: transform 0.2s;
+        }
+
+        .achievement-image.locked {
+            filter: grayscale(100%) brightness(0.5);
+            cursor: not-allowed;
+        }
+
+        .achievement-image:not(.locked):hover {
+            transform: scale(1.05);
+        }
+
+        .achievement-progress {
+            display: flex;
+            gap: 5px;
+            margin-top: 8px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .progress-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ddd;
+            transition: all 0.3s;
+        }
+
+        .progress-dot.completed {
+            background: #667eea;
+            box-shadow: 0 0 5px rgba(102, 126, 234, 0.5);
+        }
+
+        .achievement-name {
+            text-align: center;
+            margin-top: 5px;
+            font-size: 12px;
+            color: #666;
+            font-weight: bold;
+        }
+
+        @media (max-width: 768px) {
+            .achievements-panel {
+                position: static;
+                margin: 20px auto;
+                max-width: 90vw;
+            }
+        }
     </style>
 </head>
 <body>
+    <!-- 成就面板 -->
+    <div class="achievements-panel">
+        <div class="achievements-title">成就收藏</div>
+        <div id="achievements-container"></div>
+    </div>
+
     <div class="container">
         <h1>Hi,寶玉</h1>
 
@@ -210,7 +309,17 @@
         // 照片陣列 - 方便未來新增更多照片
         const IMAGES = [
             'image.png',
-            'image2.png'
+            'image2.png',
+            'image3.png',
+            'image4.png',
+            'image5.png',
+            'image6.png',
+            'image7.png',
+            'image8.png',
+            'image9.png',
+            'image10.png',
+            'image11.png',
+            'image12.png'
             // 在這裡新增更多照片路徑
         ];
 
@@ -235,6 +344,134 @@
         const successMessage = document.getElementById('success-message');
         const overlay = document.getElementById('overlay');
         const closeMessageBtn = document.getElementById('close-message');
+        const achievementsContainer = document.getElementById('achievements-container');
+
+        // 成就系統 - 儲存格式: { imagePath: { unlocked: true, completedSizes: [4, 5, 7, ...] } }
+        let achievements = {};
+
+        // 載入成就資料
+        function loadAchievements() {
+            const saved = localStorage.getItem('puzzleAchievements');
+            if (saved) {
+                achievements = JSON.parse(saved);
+            } else {
+                // 初始化所有圖片的成就
+                IMAGES.forEach(img => {
+                    achievements[img] = {
+                        unlocked: false,
+                        completedSizes: []
+                    };
+                });
+            }
+        }
+
+        // 儲存成就資料
+        function saveAchievements() {
+            localStorage.setItem('puzzleAchievements', JSON.stringify(achievements));
+        }
+
+        // 解鎖成就
+        function unlockAchievement(imagePath, gridSize) {
+            if (!achievements[imagePath]) {
+                achievements[imagePath] = {
+                    unlocked: false,
+                    completedSizes: []
+                };
+            }
+
+            // 第一次完成該圖片，解鎖
+            if (!achievements[imagePath].unlocked) {
+                achievements[imagePath].unlocked = true;
+            }
+
+            // 記錄完成的尺寸
+            if (!achievements[imagePath].completedSizes.includes(gridSize)) {
+                achievements[imagePath].completedSizes.push(gridSize);
+                achievements[imagePath].completedSizes.sort((a, b) => a - b);
+            }
+
+            saveAchievements();
+            renderAchievements();
+        }
+
+        // 渲染成就面板
+        function renderAchievements() {
+            achievementsContainer.innerHTML = '';
+
+            // 只顯示已解鎖的成就
+            IMAGES.forEach(imagePath => {
+                if (!achievements[imagePath]) {
+                    achievements[imagePath] = {
+                        unlocked: false,
+                        completedSizes: []
+                    };
+                }
+
+                const achievement = achievements[imagePath];
+
+                // 只顯示已解鎖的圖片
+                if (!achievement.unlocked) {
+                    return;
+                }
+
+                const item = document.createElement('div');
+                item.className = 'achievement-item unlocked';
+
+                // 圖片名稱（從路徑提取）
+                const imageName = imagePath.split('/').pop().split('.')[0];
+
+                // 圖片預覽
+                const imageDiv = document.createElement('div');
+                imageDiv.className = 'achievement-image';
+                imageDiv.style.backgroundImage = `url('${imagePath}')`;
+                imageDiv.addEventListener('click', () => downloadAchievementImage(imagePath));
+                imageDiv.title = '點擊下載圖片';
+
+                // 進度點 (4x4 到 12x12，共9種尺寸)
+                const progressDiv = document.createElement('div');
+                progressDiv.className = 'achievement-progress';
+
+                for (let size = 4; size <= 12; size++) {
+                    const dot = document.createElement('div');
+                    dot.className = 'progress-dot';
+                    if (achievement.completedSizes.includes(size)) {
+                        dot.classList.add('completed');
+                    }
+                    dot.title = `${size}x${size}`;
+                    progressDiv.appendChild(dot);
+                }
+
+                // 名稱
+                const nameDiv = document.createElement('div');
+                nameDiv.className = 'achievement-name';
+                nameDiv.textContent = imageName;
+
+                item.appendChild(imageDiv);
+                item.appendChild(progressDiv);
+                item.appendChild(nameDiv);
+                achievementsContainer.appendChild(item);
+            });
+
+            // 如果沒有任何成就，顯示提示訊息
+            if (achievementsContainer.children.length === 0) {
+                const emptyMessage = document.createElement('div');
+                emptyMessage.style.textAlign = 'center';
+                emptyMessage.style.color = '#999';
+                emptyMessage.style.fontSize = '14px';
+                emptyMessage.style.padding = '20px 10px';
+                emptyMessage.textContent = '完成拼圖即可解鎖成就！';
+                achievementsContainer.appendChild(emptyMessage);
+            }
+        }
+
+        // 下載成就圖片
+        function downloadAchievementImage(imagePath) {
+            const link = document.createElement('a');
+            link.href = imagePath;
+            const fileName = imagePath.split('/').pop();
+            link.download = fileName;
+            link.click();
+        }
 
         // localStorage 功能
         function saveGameState() {
@@ -440,6 +677,9 @@
         function winGame() {
             clearInterval(timerInterval);
 
+            // 解鎖成就
+            unlockAchievement(IMAGE_PATH, GRID_SIZE);
+
             // 清除遊戲狀態
             localStorage.removeItem('puzzleGameState');
 
@@ -490,6 +730,10 @@
         downloadBtn.addEventListener('click', downloadImage);
         solveBtn.addEventListener('click', showSolution);
         closeMessageBtn.addEventListener('click', closeSuccessMessage);
+
+        // 初始化成就系統
+        loadAchievements();
+        renderAchievements();
 
         // 初始化遊戲 - 如果有儲存的遊戲狀態就載入，否則開始新遊戲
         const hasSavedGame = localStorage.getItem('puzzleGameState');
